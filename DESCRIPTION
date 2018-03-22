@@ -1,0 +1,13 @@
+Package: DataRemix
+Type: Package
+Title: DataRemix: a universal data transformation for optimal inference from gene expression datasets
+Version: 0.99.0
+Date: 2018-3-19
+Author: Maria Chikina, Weiguang Mao
+Maintainer: <mchikina@gmail.com>
+Description: DataRemix
+License: GPL (>=2)
+RoxygenNote: 6.0.1
+VignetteBuilder: knitr
+Depends: MASS
+LazyData: true
