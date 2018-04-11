@@ -3,7 +3,7 @@
 \title{Main DataRemix function}
 \usage{
 DataRemix(svdres, fn, lower_limit = c(1,-1,0), upper_limit = c(length(transData.svd$d), 1,1), num_of_initialization = 5
-                      num_of_thompson = 600, basis = basis[1_2000,], xi = 0.1, full = T, verbose = T,...)
+                      num_of_thompson = 600, basis = omega, xi = 0.1, full = T, verbose = T,...)
 }                      
 \arguments{
 \item{svdres}{The full SVD decomposition of input gene expression profile X, which is equal to svd(X)}
@@ -18,14 +18,14 @@ DataRemix(svdres, fn, lower_limit = c(1,-1,0), upper_limit = c(length(transData.
 
 \item{num_of_thompson}{The number of steps of Thompson Sampling, which is 600 by default}
 
-\item{basis}{mt is set to be 2000 by default}
+\item{basis}{The default mt is set to be 2,500. You can specify a smaller mt by using omega[1:2000,] for example, if you want to set mt to be 2,000.}
 
 \item{xi}{A pre-defined probability which ensures the search doesn't stuck in the local optimum, which is 0.1 by default}
 
 \item{full}{If full is set to be True, the output will be the complete search history. Otherwise the output will only be the optimal combination of k, p and \eqn{\mu} and the corresponding biological metric}
-}
 
 \item{verbose}{If verbose is set to be True, then after each Thompson Sampling iteration, the function will print out the intermediate result.}
+}
 
 \value{
 \item{para}{If verbose is set to be True, the dimension of para is (num_of_initialization+num_of_thompson)-by-4(k, p, \eqn{\mu}, biological metric). Otherwise, para is only a single vector with length 4}

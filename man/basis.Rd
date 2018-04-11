@@ -1,13 +1,13 @@
-\name{basis}
-\alias{basis}
+\name{Omega}
+\alias{Omega}
 \docType{data}
 \title{
 Omega sampled from Fourier transfrom of Kernel
 }
 \description{
-A matrix with dimension 2500-by-3 records Omegas.
+A matrix with dimension 2500-by-3 records Omegas. It is automatically loaded into the environment as you load DataRemix package.
 }
-\usage{data(basis)}
+\usage{data(Omega)}
 \format{
 
 }
@@ -21,6 +21,6 @@ A matrix with dimension 2500-by-3 records Omegas.
 %%  ~~ possibly secondary sources and usages ~~
 }
 \examples{
-data(basis)
+data(Omega)
 }
 \keyword{datasets}

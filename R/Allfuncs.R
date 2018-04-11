@@ -189,7 +189,7 @@ SVDcombine<-function(svdData, k, power, lambda=0){
 
 
 #DESCRIPTION: LazyData: true
-DataRemix <- function(svdres, fn, lower_limit = c(1,-1,0), upper_limit = c(length(svdres$d), 1,1), num_of_initialization = 5,                   num_of_thompson = 600, basis = basis, xi = 0.1, full = T, verbose = T, ...){
+DataRemix <- function(svdres, fn, lower_limit = c(1,-1,0), upper_limit = c(length(svdres$d), 1,1), num_of_initialization = 5,                   num_of_thompson = 600, basis = omega, xi = 0.1, full = T, verbose = T, ...){
     mt <- nrow(basis)
     set.seed(1)
     b <- runif(mt)*2*pi

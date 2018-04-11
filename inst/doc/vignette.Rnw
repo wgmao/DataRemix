@@ -2,13 +2,16 @@
 
 \begin{document}
 \SweaveOpts{concordance=TRUE}
-\section{A Toy Example}
-Define a simple objective function which calculates the squared error between the DataRemix reconstruction and the original input matrix and the reconstruction error comes with a penalty term. The maximal value should be the same as penalty.
-<<echo=TRUE>>=
+
+<<>>=
 library(DataRemix)
-reconstruct <- function(X_reconstruct, X, penalty){
+@
+\section{A Toy Example}
+Define a simple objective function which calculates the sum of a penalty term and the squared error between the DataRemix reconstruction and the original input matrix. The input matrix is a 100-by-9 matrix with random values. In this case, we know that when k=9,p=1 or $\mu=1$, p=1, it achieves the maximal value which is qual to the penalty term.
+<<echo=TRUE>>=
+eval <- function(X_reconstruct, X, penalty){
   return(-sum((X-X_reconstruct)^2)+penalty)
-}#reconstruct
+}#eval
 
 @
 Genrate a random matrix with dimension 100-by-9 and perform the SVD decomposition.
@@ -21,11 +24,11 @@ svdres <- svd(X)
 @
 Set mt to be 2000.
 <<echo=TRUE>>=
-basis_short <- basis[1:2000,]
+basis_short <- omega[1:2000,]
 @
-Infer the optimal combinations of k, p and $\mu$
-<<echo=TRUE,tidy=TRUE>>=
-DataRemix.res <- DataRemix(svdres, reconstruct, lower_limit = c(1,-1,0), 
+Infer the optimal combinations of k, p and $\mu$. Here X and penalty are additional inputs for the eval() function.
+<<echo=TRUE>>=
+DataRemix.res <- DataRemix(svdres, eval, lower_limit = c(1,-1,0), 
                  upper_limit = c(length(svdres$d), 1,1), num_of_initialization = 5,
                  num_of_thompson = 50, basis = basis_short, xi = 0.1, full = T, 
                  verbose = F, X = X, penalty = 100)
