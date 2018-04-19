@@ -119,6 +119,11 @@ thompson_sampling <- function (lower, upper, record, K, y, basis, b)
 
 
 main <- function(record, lower_limit, upper_limit, basis, b){
+  #log scale on mu
+  record[,length(lower_limit)] <- log10(record[,length(lower_limit)])
+  lower_limit[length(lower_limit)]<- log10(lower_limit[length(lower_limit)])
+  upper_limit[length(upper_limit)] <- log10(upper_limit[length(upper_limit)])
+  
   #scale
   mean_val <- apply(record,2,mean)
   sd_val <- apply(record,2,sd)
@@ -148,6 +153,8 @@ main <- function(record, lower_limit, upper_limit, basis, b){
   for (j in 1:length(lower_limit)){
     if (j==1){
       new_comb <- c(new_comb, min(max(round(res$par[j]*sd_val[j]+mean_val[j]),lower_limit[j]), upper_limit[j])  )  
+    }else if (j==3){
+      new_comb <- c(new_comb, 10^min(max(res$par[j]*sd_val[j]+mean_val[j],lower_limit[j]), upper_limit[j])   )  
     }else{
       new_comb <- c(new_comb, min(max(res$par[j]*sd_val[j]+mean_val[j],lower_limit[j]), upper_limit[j])   )  
     }#else
@@ -164,6 +171,22 @@ random_sample <- function(lower, upper){
   return(c(para1,para2,para3))
 }#random_sample
 
+
+coarsed_grid <- function(lower, upper){
+  loc <- c(0.25, 0.5, 0.75)
+  para <- c()
+  for (i in 1:length(loc)){
+    for (j in 1:length(loc)){
+      for (k in 1:length(loc)){
+         para1 <- floor(lower[1]+loc[i]*(upper[1]-lower[1]))
+         para2 <- lower[2]+loc[j]*(upper[2]-lower[2])
+         para3 <- lower[3]+loc[k]*(upper[3]-lower[3])
+         para <- rbind(para, c(para1, para2, para3))
+      }#for k
+    }#for j
+  }#for i
+  return(para)
+}#coarsed_grid
 
 
 
@@ -189,18 +212,29 @@ SVDcombine<-function(svdData, k, power, lambda=0){
 
 
 #DESCRIPTION: LazyData: true
-DataRemix <- function(svdres, fn, lower_limit = c(1,-1,0), upper_limit = c(length(svdres$d), 1,1), num_of_initialization = 5,                   num_of_thompson = 600, basis = omega, xi = 0.1, full = T, verbose = T, ...){
+DataRemix <- function(svdres, fn, k_limits = c(1, ceiling(length(svdres$d)/2)), p_limits = c(-1,1), mu_limits = c(1e-12,1), num_of_initialization = 5, num_of_thompson = 600, basis = omega, xi = 0.1, full = T, verbose = T, ...){
     mt <- nrow(basis)
     set.seed(1)
     b <- runif(mt)*2*pi
 
+    lower_limit <- c(k_limits[1], p_limits[1], mu_limits[1])
+    upper_limit <- c(k_limits[2], p_limits[2], mu_limits[2])
+    
     #Initialization
     history <- c()
+    if (num_of_initialization==0){
+        para <- coarsed_grid(lower_limit, upper_limit)
+        for (i in 1:nrow(para)){
+          rec.term <- fn(SVDcombine(svdres, k= para[i,1], p=para[i,2], lambda = para[i,3]), ...)
+          history <- rbind(history,c(para[i,], rec.term))
+        }#for i
+    }else{
     for (i in 1:num_of_initialization){
       para <- random_sample(lower_limit, upper_limit)
       rec.term <- fn(SVDcombine(svdres, k= para[1], p=para[2], lambda = para[3]), ...)
       history <- rbind(history,c(para, rec.term))
-    }#Initialization
+    }#for i
+    }#Random Search
     
     
     #Thompson
