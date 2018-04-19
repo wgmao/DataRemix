@@ -28,10 +28,11 @@ basis_short <- omega[1:2000,]
 @
 Infer the optimal combinations of k, p and $\mu$. Here X and penalty are additional inputs for the eval() function.
 <<echo=TRUE>>=
-DataRemix.res <- DataRemix(svdres, eval, lower_limit = c(1,-1,0), 
-                 upper_limit = c(length(svdres$d), 1,1), num_of_initialization = 5,
-                 num_of_thompson = 50, basis = basis_short, xi = 0.1, full = T, 
-                 verbose = F, X = X, penalty = 100)
+DataRemix.res <- DataRemix(svdres, eval, k_limits = c(1, length(svdres$d)), 
+                 p_limits = c(-1,1), mu_limits = c(1e-12,1), 
+                 num_of_initialization = 5, num_of_thompson = 50, 
+                 basis = basis_short, xi = 0.1, full = T, verbose = F, 
+                 X = X, penalty = 100)
 knitr::kable(cbind(1:55,DataRemix.res$para), align = "l", 
              col.names = c("Iteration","k","p","mu","Eval"))
 @
