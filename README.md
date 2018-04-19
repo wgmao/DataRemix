@@ -11,7 +11,7 @@ MASS
 To install the R package
 ```
 library(devtools)
-install_github("wgmao/DataRemix", auth_token = "Your Token")
+install_github("wgmao/DataRemix")
 ```
 
 Check out the vignette [here](vignettes/vignette.pdf)
