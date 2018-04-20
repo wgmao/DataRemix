@@ -5,7 +5,7 @@ DataRemix: a universal data transformation for optimal inference from gene expre
 Library dependencies
 
 ```
-MASS
+MASS 7.3-49
 ```
 
 To install the R package
