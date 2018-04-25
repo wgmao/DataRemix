@@ -180,7 +180,7 @@ coarsed_grid <- function(lower, upper){
       for (k in 1:length(loc)){
          para1 <- floor(lower[1]+loc[i]*(upper[1]-lower[1]))
          para2 <- lower[2]+loc[j]*(upper[2]-lower[2])
-         para3 <- lower[3]+loc[k]*(upper[3]-lower[3])
+         para3 <- 10^(log10(lower[3])+loc[k]*(log10(upper[3])-log10(lower[3])))
          para <- rbind(para, c(para1, para2, para3))
       }#for k
     }#for j
