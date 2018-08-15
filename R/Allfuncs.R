@@ -263,10 +263,10 @@ DataRemix <- function(svdres, fn, k_limits = c(1, ceiling(length(svdres$d)/2)), 
     
     #output record or only the best
     if (full){
-      return(list(para = record))
+      return(list(para = record, full = history))
     }else{
       index = which.max(record[ncol(record)])
-      return(list(para = record[index,]))
+      return(list(para = record[index,], full = history[index,]))
     }#else
 }#DataRemix
 
