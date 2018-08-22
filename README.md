@@ -5,7 +5,9 @@ DataRemix: a universal data transformation for optimal inference from gene expre
 R library dependencies
 
 ```
-MASS 7.3-49
+MASS
+ROCR
+caTools
 ```
 
 Extra library dependencies
