@@ -9,5 +9,5 @@ Description: DataRemix
 License: GPL (>=2)
 RoxygenNote: 6.0.1
 VignetteBuilder: knitr
-Depends: MASS
+Depends: MASS, ROCR, caTools
 LazyData: true
