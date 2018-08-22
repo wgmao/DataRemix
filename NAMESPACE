@@ -1,1 +1,2 @@
 export(DataRemix)
+export(corMatToAUC)
