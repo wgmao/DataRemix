@@ -7,14 +7,14 @@
 library(DataRemix)
 @
 \section{A Toy Example}
-Define a simple objective function which calculates the sum of a penalty term and the squared error between the DataRemix reconstruction and the original input matrix. The input matrix is a 100-by-9 matrix with random values. In this case, we know that when k=9,p=1 or $\mu=1$, p=1, it achieves the maximal value which is qual to the penalty term.
+In this section, we define a simple objective function called $eval()$ which calculates the sum of a penalty term and the squared error between the DataRemix reconstruction and the original input matrix. The input matrix is a 100-by-9 matrix with random values. In this case, we know that when k=9,p=1 or $\mu=1$, p=1, DataRemix reconstruction is the same as the orginial matrix and the objective function achieves the minimal value which is qual to the penalty term we add. 
 <<echo=TRUE>>=
 eval <- function(X_reconstruct, X, penalty){
   return(-sum((X-X_reconstruct)^2)+penalty)
 }#eval
 
 @
-Genrate a random matrix with dimension 100-by-9 and perform the SVD decomposition.
+First we genrate a random matrix with dimension 100-by-9 and perform the SVD decomposition.
 <<echo=TRUE>>=
 set.seed(1)
 num_of_row <- 100
@@ -26,7 +26,7 @@ Set mt to be 2000.
 <<echo=TRUE>>=
 basis_short <- omega[1:2000,]
 @
-Infer the optimal combinations of k, p and $\mu$. Here X and penalty are additional inputs for the eval() function.
+Infer the optimal combinations of k, p and $\mu$. Here $X$ and $penalty$ are additional inputs for the $eval()$ function.
 <<echo=TRUE>>=
 DataRemix.res <- DataRemix(svdres, eval, k_limits = c(1, length(svdres$d)), 
                  p_limits = c(-1,1), mu_limits = c(1e-12,1), 
@@ -35,5 +35,102 @@ DataRemix.res <- DataRemix(svdres, eval, k_limits = c(1, length(svdres$d)),
                  X = X, penalty = 100)
 knitr::kable(cbind(1:55,DataRemix.res$para), align = "l", 
              col.names = c("Iteration","k","p","mu","Eval"))
+@
+\section{GTex}
+In this section, we show a different task of recovering known pathways based on the GTex gene expression data. $corMatToAUC()$ is the main objective function with two inputs: $data$ and $GS$. Here $data$ is the correlation matrix across all genes and $GS$ is a binary matrix with indicates the canonical mSigDB pathways. We formally define the object as the average AUC across pathways and we also keep track of the average AUPR value.
+<<echo=TRUE>>=
+library(DataRemix)
+library(ROCR)
+library(caTools)
+
+auc_pr<-function(obs, pred) {
+  xx.df <- prediction(pred, obs)
+  perf  <- performance(xx.df, "prec", "rec")
+  xy    <- data.frame(recall=perf@x.values[[1]], precision=perf@y.values[[1]])
+  xy <- subset(xy, !is.nan(xy$precision))
+  #add a point at 0
+  xy <- rbind(c(0, xy[1,2]), xy)
+  res   <- trapz(xy$recall, xy$precision)
+  return(res)
+}#auc_pr
+
+simpleAUC<-function(lab, value){
+  value=as.numeric(rank(value)-1)
+  posn=as.numeric(sum(lab==1))
+  negn=as.numeric(sum(lab!=1))
+  stat=sum(value[lab==1])-posn*(posn+1)/2
+  return(stat/(posn*negn))
+}#simpleAUC
+
+perPathPR<-function(pathPredict, GS){
+  length=ncol(pathPredict)
+  pathPR=double(length)
+  for(i in 1:length){
+    x=pathPredict[,i]
+    y=GS[,i]
+    auc=auc_pr(y, x)
+    pathPR[i]=auc
+  }
+  return(pathPR)
+}#perPathPR
+
+perPathAUC<-function(pathPredict, GS){
+  length=ncol(pathPredict)
+  pathPR=double(length)
+  for(i in 1:length){
+    x=pathPredict[,i]
+    y=GS[,i]
+    auc=simpleAUC(y, x)
+    pathPR[i]=auc
+  }
+  return(pathPR)
+}#perPathAUC
+
+corMatToAUC=function(data, GS){
+  #self-correlation is 0
+  diag(data)=0
+  data[is.na(data)]=0
+  pathPredict=data%*%GS
+  #fix values for genes that are in the pathway since they only get n-1 correlations
+  nGenes=colSums(GS)
+  #factor to multiply by
+  pathwayF=unlist(lapply(nGenes, function(x){x/(x-1)}))
+  for(i in 1:ncol(GS)){
+    iigenes=which(GS[,i]==1)
+    pathPredict[iigenes,i]=  pathPredict[iigenes,i]*pathwayF[i]
+  }
+  
+  PATHAUPR=perPathPR(pathPredict, GS)
+  PATHAUC=perPathAUC(pathPredict, GS)
+  return(c(mean(PATHAUPR),mean(PATHAUC)))
+}#corMatToAUC
+@
+Load the data. $GTex_cc$ stands for the correlation matrix and $canonical$ represents the pathway matrix. It takes time to decompose $GTex_cc$, thus we pre-compute the SVD decomposition of $GTex_cc$ and load it as $GTex_svdres$.
+<<echo=TRUE>>=
+load(url("https://www.dropbox.com/s/o949wkg76k0ccaw/GTex_cc.rdata?dl=1"))
+load(url("https://www.dropbox.com/s/wsuze8w2rp0syqg/GTex_svdres.rdata?dl=1"))
+load(url("https://github.com/wgmao/DataRemix/blob/master/inst/extdata/canonical.rdata?raw=true"))
+#svdres <- svd(GTex_cc)
+@
+Run corMatToAUC() on the default correlation matrix $GTex_cc$.
+<<echo=TRUE>>=
+GTex_default <- corMatToAUC(GTex_cc, canonical)
+GTex_default
+@
+Set mt to be 2000.
+<<echo=TRUE>>=
+basis_short <- omega[1:2000,]
+@
+Infer the optimal combinations of k, p and $\mu$. Here $GS$ is the additional input for the $corMatToAUC()$ function.
+<<echo=TRUE>>=
+DataRemix.res <- DataRemix(GTex_svdres, corMatToAUC, 
+                           k_limits = c(1, length(svdres$d)%/%2), 
+                           p_limits = c(-1,1), mu_limits = c(1e-12,1), 
+                           num_of_initialization = 5, num_of_thompson = 150, 
+                           basis = basis_short, xi = 0.1, full = T, verbose = F, 
+                           GS = canonical)
+knitr::kable(cbind(1:15,DataRemix.res$full[order(DataRemix.res$para[,4],decreasing = T)
+             [1:15],]), align = "l", col.names = c("Iteration","k","p","mu",
+             "mean AUPR", "mean AUC"))
 @
 \end{document}
