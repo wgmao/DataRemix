@@ -127,6 +127,12 @@ main <- function(record, lower_limit, upper_limit, basis, b){
   #scale
   mean_val <- apply(record,2,mean)
   sd_val <- apply(record,2,sd)
+  for (j in 1:length(sd_val)){
+    if (sd_val[j]==0){
+      sd_val[j] <-1
+      mean_val[j] <- 0
+    }#if
+  }#for j
   record_scale <- sweep(record,2,mean_val,"-")
   record_scale <- sweep(record_scale,2,sd_val,"/")
   
