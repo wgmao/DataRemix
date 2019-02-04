@@ -4,7 +4,7 @@
 \SweaveOpts{concordance=TRUE}
 
 \section{A Toy Example}
-In this section, we define a simple objective function called $eval()$ which calculates the sum of a penalty term and the squared error between the DataRemix reconstruction and the original input matrix. The input matrix is a 100-by-9 matrix with random values. In this case, we know that when k=9,p=1 or $\mu=1$, p=1, DataRemix reconstruction is the same as the orginial matrix and the objective function achieves the minimal value which is qual to the penalty term we add. 
+In this section, we define a simple objective function called $eval()$ which calculates the sum of a penalty term and the squared error between the DataRemix reconstruction and the original input matrix. This example illustrates how to include additional parameters which are necessary for the customized evaluation function fn() into DataRemix framework. The input matrix is a 100-by-9 matrix with random values. In this case, we know that when k=9,p=1 or $\mu=1$, p=1, DataRemix reconstruction is the same as the orginial matrix and the objective function achieves the minimal value which is qual to the penalty term we add. 
 <<echo=TRUE>>=
 library(DataRemix)
 eval <- function(X_reconstruct, X, penalty){
@@ -23,13 +23,13 @@ Set mt to be 2000.
 <<echo=TRUE>>=
 basis_short <- omega[1:2000,]
 @
-Infer the optimal combinations of k, p and $\mu$. Here $X$ and $penalty$ are additional inputs for the $eval()$ function.
+Infer the optimal combinations of k, p and $\mu$. Here $X$ and $penalty$ are additional inputs for the $eval()$ function. If we have the full SVD decomposition, we can leave matrix as NULL. For some large-scale matrices, if the SVD computation is time intensive, we don't need to finish the full SVD. Instead we can just compute the SVD decomposition up to a sufficient rank and inlcude the original gene expression profile to calculate the residual.
 <<echo=TRUE>>=
-DataRemix.res <- DataRemix(svdres, eval, k_limits = c(1, length(svdres$d)), 
-                 p_limits = c(-1,1), mu_limits = c(1e-12,1), 
-                 num_of_initialization = 5, num_of_thompson = 50, 
-                 basis = basis_short, xi = 0.1, full = T, verbose = F, 
-                 X = X, penalty = 100)
+DataRemix.res <- DataRemix(svdres, matrix = NULL, eval, 
+                 k_limits = c(1, length(svdres$d)), p_limits = c(-1,1), 
+                 mu_limits = c(1e-12,1), num_of_initialization = 5, 
+                 num_of_thompson = 50, basis = basis_short, xi = 0.1, 
+                 full = T, verbose = F, X = X, penalty = 100)
 knitr::kable(cbind(1:55,DataRemix.res$para), align = "l", 
              col.names = c("Iteration","k","p","mu","Eval"))
 @
@@ -56,14 +56,14 @@ basis_short <- omega[1:2000,]
 @
 Infer the optimal combinations of k, p and $\mu$. Here $GS$ is the additional input for the $corMatToAUC()$ function.
 <<echo=TRUE>>=
-DataRemix.res <- DataRemix(GTex_svdres, corMatToAUC, 
+DataRemix.res <- DataRemix(GTex_svdres, GTex_cc,corMatToAUC, 
                            k_limits = c(1, length(GTex_svdres$d)%/%2), 
                            p_limits = c(-1,1), mu_limits = c(1e-12,1), 
                            num_of_initialization = 5, num_of_thompson = 150, 
                            basis = basis_short, xi = 0.1, full = T, verbose = F, 
                            GS = canonical)
-knitr::kable(cbind(1:15,DataRemix.res$full[order(DataRemix.res$para[,4],decreasing = T)
-             [1:15],]), align = "l", col.names = c("Rank","k","p","mu",
-             "mean AUPR", "mean AUC"))
+knitr::kable(cbind(1:15,DataRemix.res$full[order(DataRemix.res$para[,4],
+            decreasing = T)[1:15],]), align = "l", col.names = c("Rank",
+            "k","p","mu","mean AUPR", "mean AUC"))
 @
 \end{document}
