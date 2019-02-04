@@ -184,10 +184,10 @@ coarsed_grid <- function(lower, upper){
   for (i in 1:length(loc)){
     for (j in 1:length(loc)){
       for (k in 1:length(loc)){
-         para1 <- floor(lower[1]+loc[i]*(upper[1]-lower[1]))
-         para2 <- lower[2]+loc[j]*(upper[2]-lower[2])
-         para3 <- 10^(log10(lower[3])+loc[k]*(log10(upper[3])-log10(lower[3])))
-         para <- rbind(para, c(para1, para2, para3))
+        para1 <- floor(lower[1]+loc[i]*(upper[1]-lower[1]))
+        para2 <- lower[2]+loc[j]*(upper[2]-lower[2])
+        para3 <- 10^(log10(lower[3])+loc[k]*(log10(upper[3])-log10(lower[3])))
+        para <- rbind(para, c(para1, para2, para3))
       }#for k
     }#for j
   }#for i
@@ -196,7 +196,7 @@ coarsed_grid <- function(lower, upper){
 
 
 
-SVDcombine<-function(svdData, k, power, lambda=0){
+SVDcombine<-function(svdData, k, power=1, lambda=0){
   if (k >1){
     SVDcombine=svdData$u[, 1:k] %*% diag(svdData$d[1:k]^(power)) %*% t(svdData$v[, 1:k])  
   }else{
@@ -212,68 +212,99 @@ SVDcombine<-function(svdData, k, power, lambda=0){
     }#else if
   }#if
   rownames(SVDcombine)=rownames(svdData$u)
-  colnames(SVDcombine)=colnames(svdData$u)
+  colnames(SVDcombine)=rownames(svdData$v)
   SVDcombine
 }#SVDcombine
 
 
-#DESCRIPTION: LazyData: true
-DataRemix <- function(svdres, fn, k_limits = c(1, ceiling(length(svdres$d)/2)), p_limits = c(-1,1), mu_limits = c(1e-12,1), num_of_initialization = 5, num_of_thompson = 600, basis = omega, xi = 0.1, full = T, verbose = T, ...){
-    mt <- nrow(basis)
-    set.seed(1)
-    b <- runif(mt)*2*pi
-
-    lower_limit <- c(k_limits[1], p_limits[1], mu_limits[1])
-    upper_limit <- c(k_limits[2], p_limits[2], mu_limits[2])
-    
-    #Initialization
-    history <- c()
-    if (num_of_initialization==0){
-        para <- coarsed_grid(lower_limit, upper_limit)
-        for (i in 1:nrow(para)){
-          rec.term <- fn(SVDcombine(svdres, k= para[i,1], p=para[i,2], lambda = para[i,3]), ...)
-          history <- rbind(history,c(para[i,], rec.term))
-        }#for i
+SVDcombineFast <- function(svdData, matrix, k, power=1, lambda=0){
+  if (k >1){
+    SVDcombine=svdData$u[, 1:k] %*% diag(svdData$d[1:k]^(power)) %*% t(svdData$v[, 1:k])  
+  }else{
+    SVDcombine= (svdData$d[1:k]^(power)) *matrix(svdData$u[, 1:k],ncol = 1) %*% matrix(svdData$v[, 1:k], nrow = 1)  
+  }
+  
+  if(lambda>0){
+    if (k == 1){
+      principal <- (svdData$d[1:k]) *matrix(svdData$u[, 1:k],ncol = 1) %*% matrix(svdData$v[, 1:k], nrow = 1)  
     }else{
+      principal <- svdData$u[, 1:k] %*% diag(svdData$d[1:k]) %*% t(svdData$v[, 1:k])  
+    }#else
+    SVDcombine <- SVDcombine+lambda*(matrix-principal)
+  }#if
+  rownames(SVDcombine)=rownames(svdData$u)
+  colnames(SVDcombine)=rownames(svdData$v)
+  SVDcombine
+}#SVDcombine
+
+
+DataRemix <- function(svdres, matrix=NULL, fn, k_limits = c(1, ceiling(length(svdres$d)/2)), p_limits = c(-1,1), mu_limits = c(1e-12,1), num_of_initialization = 5, num_of_thompson = 600, basis = omega, xi = 0.1, full = T, verbose = T, ...){
+  mt <- nrow(basis)
+  set.seed(1)
+  b <- runif(mt)*2*pi
+  fast <- !is.null(matrix)
+  
+  lower_limit <- c(k_limits[1], p_limits[1], mu_limits[1])
+  upper_limit <- c(k_limits[2], p_limits[2], mu_limits[2])
+  
+  #Initialization
+  history <- c()
+  if (num_of_initialization==0){
+    para <- coarsed_grid(lower_limit, upper_limit)
+    for (i in 1:nrow(para)){
+      if (fast){
+        rec.term <- fn(SVDcombineFast(svdres, matrix, k= para[i,1], p=para[i,2], lambda = para[i,3]), ...)  
+      }else{
+        rec.term <- fn(SVDcombine(svdres, k= para[i,1], p=para[i,2], lambda = para[i,3]), ...)  
+      }#else
+      history <- rbind(history,c(para[i,], rec.term))
+    }#for i
+  }else{
     for (i in 1:num_of_initialization){
       para <- random_sample(lower_limit, upper_limit)
-      rec.term <- fn(SVDcombine(svdres, k= para[1], p=para[2], lambda = para[3]), ...)
-      history <- rbind(history,c(para, rec.term))
-    }#for i
-    }#Random Search
-    
-    
-    #Thompson
-    record <- history[,c(1:length(lower_limit),ncol(history))]
-    
-    for (i in 1:num_of_thompson){
-      uniform <- runif(1)
-      if (uniform < xi){
-        para <- random_sample(lower_limit, upper_limit)
+      if (fast){
+        rec.term <- fn(SVDcombineFast(svdres, matrix, k= para[1], p=para[2], lambda = para[3]), ...)  
       }else{
-        para <- main(record,lower_limit, upper_limit, basis, b) 
+        rec.term <- fn(SVDcombine(svdres, k= para[1], p=para[2], lambda = para[3]), ...)  
       }#else
-      
-      #duplicated para
-      while (length(which(record[,1]==para[1] & record[,2]==para[2] & record[,3] == para[3])) > 0){
-        para <- random_sample(lower_limit, upper_limit)
-      }#while
-      
-      rec.term <- fn(SVDcombine(svdres, k= para[1], p=para[2], lambda = para[3]), ...)
       history <- rbind(history,c(para, rec.term))
-      record <- rbind(record, c(para, rec.term[length(rec.term)]))
-      if (verbose){
-        print(c(i, para, rec.term[length(rec.term)]))  
-      }#if
     }#for i
-    
-    #output record or only the best
-    if (full){
-      return(list(para = record, full = history))
+  }#Random Search
+  
+  
+  #Thompson
+  record <- history[,c(1:length(lower_limit),ncol(history))]
+  
+  for (i in 1:num_of_thompson){
+    uniform <- runif(1)
+    if (uniform < xi){
+      para <- random_sample(lower_limit, upper_limit)
     }else{
-      index = which.max(record[ncol(record)])
-      return(list(para = record[index,], full = history[index,]))
+      para <- main(record,lower_limit, upper_limit, basis, b) 
     }#else
+    
+    #duplicated para
+    while (length(which(record[,1]==para[1] & record[,2]==para[2] & record[,3] == para[3])) > 0){
+      para <- random_sample(lower_limit, upper_limit)
+    }#while
+    
+    if (fast){
+      rec.term <- fn(SVDcombineFast(svdres, matrix, k= para[1], p=para[2], lambda = para[3]), ...)  
+    }else{
+      rec.term <- fn(SVDcombine(svdres, k= para[1], p=para[2], lambda = para[3]), ...)  
+    }#else
+    history <- rbind(history,c(para, rec.term))
+    record <- rbind(record, c(para, rec.term[length(rec.term)]))
+    if (verbose){
+      print(c(i, para, rec.term[length(rec.term)]))  
+    }#if
+  }#for i
+  
+  #output record or only the best
+  if (full){
+    return(list(para = record, full = history))
+  }else{
+    index = which.max(record[ncol(record)])
+    return(list(para = record[index,], full = history[index,]))
+  }#else
 }#DataRemix
-
-
