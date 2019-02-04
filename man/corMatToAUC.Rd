@@ -7,7 +7,7 @@ corMatToAUC(data, GS)
 \arguments{
 \item{data}{Correlation matrix with the dimension gene-by-gene}
 
-\item{GS}{GS stands for gold standard which is a binary matrix with the dimension gene-by-pathway. The number of rows should match that of data and the genes should be in the same order.}
+\item{GS}{GS stands for gold standard which is a binary matrix with the dimension gene-by-pathway. The number of rows should match that of data.}
 }
 
 \value{
