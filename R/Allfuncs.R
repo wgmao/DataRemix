@@ -85,8 +85,7 @@ bayesian_A <- function(record, y, sigma, basis, b){
 
 
 
-thompson_sampling <- function (lower, upper, record, K, y, basis, b) 
-{
+thompson_sampling <- function (lower, upper, record, K, y, basis, b){
   #infer sigma
   set.seed(1)
   #sigma_res <- optim(0,marginal_likelihood,method = "Brent", lower=-10, upper = 10, K=K,y=y)
@@ -196,11 +195,11 @@ coarsed_grid <- function(lower, upper){
 
 
 
-SVDcombine<-function(svdData, k, power=1, lambda=0){
+SVDcombine<-function(svdData, k, p=1, lambda=0){
   if (k >1){
-    SVDcombine=svdData$u[, 1:k] %*% diag(svdData$d[1:k]^(power)) %*% t(svdData$v[, 1:k])  
+    SVDcombine=svdData$u[, 1:k] %*% diag(svdData$d[1:k]^(p)) %*% t(svdData$v[, 1:k])  
   }else{
-    SVDcombine= (svdData$d[1:k]^(power)) *matrix(svdData$u[, 1:k],ncol = 1) %*% matrix(svdData$v[, 1:k], nrow = 1)  
+    SVDcombine= (svdData$d[1:k]^(p)) *matrix(svdData$u[, 1:k],ncol = 1) %*% matrix(svdData$v[, 1:k], nrow = 1)  
   }
   
   if(lambda>0){
@@ -217,11 +216,11 @@ SVDcombine<-function(svdData, k, power=1, lambda=0){
 }#SVDcombine
 
 
-SVDcombineFast <- function(svdData, matrix, k, power=1, lambda=0){
+SVDcombineFast <- function(svdData, matrix, k, p=1, lambda=0){
   if (k >1){
-    SVDcombine=svdData$u[, 1:k] %*% diag(svdData$d[1:k]^(power)) %*% t(svdData$v[, 1:k])  
+    SVDcombine=svdData$u[, 1:k] %*% diag(svdData$d[1:k]^(p)) %*% t(svdData$v[, 1:k])  
   }else{
-    SVDcombine= (svdData$d[1:k]^(power)) *matrix(svdData$u[, 1:k],ncol = 1) %*% matrix(svdData$v[, 1:k], nrow = 1)  
+    SVDcombine= (svdData$d[1:k]^(p)) *matrix(svdData$u[, 1:k],ncol = 1) %*% matrix(svdData$v[, 1:k], nrow = 1)  
   }
   
   if(lambda>0){
