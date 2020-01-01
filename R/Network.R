@@ -59,3 +59,38 @@ corMatToAUC=function(data, GS){
   PATHAUC=perPathAUC(pathPredict, GS)
   return(c(mean(PATHAUPR),mean(PATHAUC)))
 }#corMatToAUC
+
+HCP=function(data, covariates, k, L1, L2, L3, max.iter, trace=F, return.all=F){
+  
+  Y=scale(t(data))/sqrt(ncol(data)-1)
+  C=scale(covariates)/sqrt(nrow(covariates)-1)
+  
+  
+  nc=ncol(covariates)
+  ng=nrow(data)
+  ns=ncol(data)
+  
+  
+  U=matrix(0,nrow=nc, ncol=k )
+  Z=matrix(0, nrow=ns, ncol=k)
+  svdres=svd(t(Y))
+  B=t(svdres$u[, 1:k])
+  
+  for ( i in 1:max.iter){
+    err0=sum((Y-Z%*%B)^2)+sum((Z-C%*%U)^2)*L1+sum(B^2)*L2+sum(U^2)*L3
+    if(trace){
+      print(err0)
+    }
+    Z=(Y%*%t(B)+L1*C%*%U)%*%solve(B%*%t(B)+L1*diag(k))
+    B=solve(t(Z)%*%Z+L2*diag(k))%*%t(Z)%*%Y
+    U=solve(t(C)%*%C*L1+L3*diag(nc))%*%t(C)%*%Z*L1    
+  }
+  
+  if(return.all){
+    return(list(res=(Y-Z%*%B), B=B, Z=Z, U=U))
+  }
+  else{
+    return(t(Y-Z%*%B))
+    
+  }
+}
