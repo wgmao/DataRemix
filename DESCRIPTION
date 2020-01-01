@@ -2,7 +2,7 @@ Package: DataRemix
 Type: Package
 Title: DataRemix: a universal data transformation for optimal inference from gene expression datasets
 Version: 0.99.0
-Date: 2018-4-18
+Date: 2019-12-31
 Author: Maria Chikina, Weiguang Mao
 Maintainer: <mchikina@gmail.com>
 Description: DataRemix
