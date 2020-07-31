@@ -8,6 +8,7 @@ R library dependencies
 MASS
 ROCR
 caTools
+knitr(only required by DataRemix_display())
 ```
 
 Extra library dependencies

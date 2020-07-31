@@ -1,3 +1,4 @@
 export(DataRemix)
+export(DataRemix_display)
 export(corMatToAUC)
 export(HCP)
