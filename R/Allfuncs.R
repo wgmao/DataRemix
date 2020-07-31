@@ -237,7 +237,17 @@ SVDcombineFast <- function(svdData, matrix, k, p=1, lambda=0){
 }#SVDcombine
 
 
-DataRemix <- function(svdres, matrix=NULL, fn, k_limits = c(1, ceiling(length(svdres$d)/2)), p_limits = c(-1,1), mu_limits = c(1e-12,1), num_of_initialization = 5, num_of_thompson = 600, basis = omega, xi = 0.1, full = T, verbose = T, ...){
+DataRemix <- function(svdres, matrix=NULL, fn, k_limits = c(1, ceiling(length(svdres$d)/2)), p_limits = c(-1,1), mu_limits = c(1e-12,1), num_of_initialization = 5, num_of_thompson = 600, basis = "omega", basis_size = 2000,xi = 0.1, full = T, verbose = T, ...){
+  
+  if (basis == "omega_Gaussian"){
+    basis <- DataRemix::omega_Gaussian
+  }else if (basis == "omega_Laplacian"){
+    basis <- DataRemix::omega_Laplacian 
+  }else{
+    basis <- DataRemix::omega
+  }#else
+  
+  
   mt <- nrow(basis)
   set.seed(1)
   b <- runif(mt)*2*pi
@@ -307,3 +317,9 @@ DataRemix <- function(svdres, matrix=NULL, fn, k_limits = c(1, ceiling(length(sv
     return(list(para = record[index,], full = history[index,]))
   }#else
 }#DataRemix
+
+
+DataRemix_display <- function(DataRemix.res, col.names = c("Rank", "k", "p", "mu", "mean AUPR", "mean AUC"), top.rank = 15){
+  knitr::kable(cbind(1:top.rank,DataRemix.res$full[order(DataRemix.res$para[,4],
+         decreasing = T)[1:top.rank],]), align = "l", col.names = col.names)
+}#DataRemix.display

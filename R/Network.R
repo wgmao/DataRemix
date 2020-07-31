@@ -29,6 +29,7 @@ perPathPR<-function(pathPredict, GS){
   return(pathPR)
 }#perPathPR
 
+
 perPathAUC<-function(pathPredict, GS){
   length=ncol(pathPredict)
   pathPR=double(length)
@@ -41,8 +42,20 @@ perPathAUC<-function(pathPredict, GS){
   return(pathPR)
 }#perPathAUC
 
-corMatToAUC=function(data, GS){
+
+corMatToAUC=function(data, GS, objective = "mean.AUC"){
+  #filter on GS
+  ##############################################
+  GS.pathway.sum <- apply(GS,2,sum)
+  GS <- GS[,which(GS.pathway.sum > 2)]
+  
+  GS.gene.sum <- apply(GS,1,sum)
+  GS <- GS[which(GS.gene.sum > 0), ]
+  data <- GS[which(GS.gene.sum > 0), which(GS.gene.sum > 0)]
+  
+  
   #self-correlation is 0
+  ##############################################
   diag(data)=0
   data[is.na(data)]=0
   pathPredict=data%*%GS
@@ -57,8 +70,20 @@ corMatToAUC=function(data, GS){
   
   PATHAUPR=perPathPR(pathPredict, GS)
   PATHAUC=perPathAUC(pathPredict, GS)
-  return(c(mean(PATHAUPR),mean(PATHAUC)))
+  
+  if (objective == "mean.AUC"){
+    return(c(mean(PATHAUPR),mean(PATHAUC)))    
+  }else if (objective == "mean.AUPR"){
+    return(c(mean(PATHAUC), mean(PATHAUPR)))
+  }else if (objective == "median.AUC"){
+    return(c(median(PATHAUPR),median(PATHAUC)))    
+  }else{
+    return(c(median(PATHAUC), median(PATHAUPR)))
+  }#else
+
 }#corMatToAUC
+
+
 
 HCP=function(data, covariates, k, L1, L2, L3, max.iter, trace=F, return.all=F){
   
