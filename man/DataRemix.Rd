@@ -1,10 +1,10 @@
 \name{DataRemix}
 \alias{DataRemix}
-\title{Main DataRemix function}
+\title{DataRemix Main function}
 \usage{
 DataRemix(svdres, matrix=NULL, fn, k_limits = c(1, ceiling(length(svdres$d)/2)), p_limits = c(-1,1), 
           mu_limits = c(1e-12,1), num_of_initialization = 5, num_of_thompson = 600, 
-          basis = omega, xi = 0.1, full = T, verbose = T,...)
+          basis = "omega", basis_size =2500, xi = 0.1, full = T, verbose = T,...)
 }                      
 \arguments{
 \item{svdres}{The full SVD decomposition of input gene expression profile X, which is equal to svd(X)}
@@ -23,7 +23,9 @@ DataRemix(svdres, matrix=NULL, fn, k_limits = c(1, ceiling(length(svdres$d)/2)),
 
 \item{num_of_thompson}{The number of steps of Thompson Sampling, which is 600 by default}
 
-\item{basis}{The default mt is set to be 2,500. You can specify a smaller mt by using omega[1:2000,] for example, if you want to set mt to be 2,000.}
+\item{basis}{The default is to use "omega" corresponding to exponential kernel. There are two other options available: "omega_Gaussian" (Gaussian kernel) and "omega_Laplacian" (Laplacian kernel)}
+
+\item{basis_size}{The default mt is set to be 2,500. You can specify a smaller mt by setting it to be 2,000.}
 
 \item{xi}{A pre-defined probability which ensures the search doesn't stuck in the local optimum, which is 0.1 by default}
 
