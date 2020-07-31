@@ -44,14 +44,23 @@ perPathAUC<-function(pathPredict, GS){
 
 
 corMatToAUC=function(data, GS, objective = "mean.AUC"){
-  #filter on GS
+  #filter on GS and data
   ##############################################
+  gene.names <- intersect(rownames(data), rownames(GS))
+  if (length(gene.names)==0){
+    stop("Plese use gene names or numerical numbers to assign rownames for data and GS.")  
+  }else{
+    data <- data[gene.names, gene.names]
+    GS <- GS[gene.names,]
+  }#else
+  
+  #filter out some pathways with few genes
   GS.pathway.sum <- apply(GS,2,sum)
   GS <- GS[,which(GS.pathway.sum > 2)]
   
   GS.gene.sum <- apply(GS,1,sum)
   GS <- GS[which(GS.gene.sum > 0), ]
-  data <- GS[which(GS.gene.sum > 0), which(GS.gene.sum > 0)]
+  data <- data[which(GS.gene.sum > 0), which(GS.gene.sum > 0)]
   
   
   #self-correlation is 0
@@ -118,4 +127,6 @@ HCP=function(data, covariates, k, L1, L2, L3, max.iter, trace=F, return.all=F){
     return(t(Y-Z%*%B))
     
   }
-}
+}#HCP
+
+
