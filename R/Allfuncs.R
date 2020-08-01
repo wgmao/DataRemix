@@ -280,6 +280,7 @@ DataRemix <- function(svdres, matrix=NULL, fn, k_limits = c(1, ceiling(length(sv
     }#for i
   }#Random Search
   
+  print(record)
   
   #Thompson
   record <- history[,c(1:length(lower_limit),ncol(history))]
