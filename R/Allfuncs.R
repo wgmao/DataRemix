@@ -323,6 +323,16 @@ DataRemix <- function(svdres, matrix=NULL, fn, k_limits = c(1, ceiling(length(sv
 
 
 DataRemix_display <- function(DataRemix.res, col.names = c("Rank", "k", "p", "mu", "mean AUPR", "mean AUC"), top.rank = 15){
-  knitr::kable(cbind(1:top.rank,DataRemix.res$full[order(DataRemix.res$para[,4],
-         decreasing = T)[1:top.rank],]), align = "l", col.names = col.names)
+  if (nrow(DataRemix.res$full) < top.rank){
+    if (nrow(DataRemix.res$full)==1){
+      knitr::kable(matrix(c(1, DataRemix.res$full), nrow=1), align = "l", col.names = col.names) 
+    }else{
+       top.rank <- nrow(DataRemix.res$full)
+       knitr::kable(cbind(1:top.rank,DataRemix.res$full[order(DataRemix.res$para[,4],
+                                                              decreasing = T)[1:top.rank],]), align = "l", col.names = col.names)  
+    }#else
+  }else{
+    knitr::kable(cbind(1:top.rank,DataRemix.res$full[order(DataRemix.res$para[,4],
+                                                           decreasing = T)[1:top.rank],]), align = "l", col.names = col.names)  
+  }#else
 }#DataRemix.display
