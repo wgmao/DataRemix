@@ -312,12 +312,17 @@ DataRemix <- function(svdres, matrix=NULL, fn, k_limits = c(1, ceiling(length(sv
   }#for i
   }#if
   
+  if (class(record)=="numeric"){
+    record <- matrix(record, nrow = 1)
+    history <- matrix(history, nrow = 1)
+  }#if
+  
   #output record or only the best
   if (full){
     return(list(para = record, full = history))
   }else{
     index = which.max(record[,ncol(record)])
-    return(list(para = record[index,], full = history[index,]))
+    return(list(para = matrix(record[index,], nrow=1), full = matrix(history[index,], nrow = 1)))
   }#else
 }#DataRemix
 
