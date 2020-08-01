@@ -4,8 +4,103 @@
 \begin{document}
 \input{vignette-concordance}
 
+There are three essential inputs in order to run $DataRemix()$.
+
+\begin{itemize}
+\item \textbf{svdres}: This stands for the SVD decomposition output of the gene expression profile $svd(\textbf{matrix})$. If the matrix is large, SVD decomposition doesn't need to be full-rank $min(nrow(\textbf{matrix}), ncol(\textbf{matrix}))$ which is computationally intensive.
+\item \textbf{matrix}: This stands for the gene expression profile with the dimension $gene-by-sample$. If \textbf{svdres} is not full-rank, matrix needs to be included in order to calculate the residual. Generally including \textbf{matrix} makes the residual computation more efficient.
+\item \textbf{objective function}: Users have to specify a objective of interest. The objective function would use remixed data based on \textbf{svdres} and \textbf{matrix} as input. It's natural to include more parameters in the objective function. The following two examples will demonstrate how to include objective-specific parameters into the $DataRemix()$ function.
+\end{itemize}
+
+Here we list two examples to illustrate how to run $DataRemix()$ function. The first example is to optimize known pathway recovery based on the GTEx gene expression profile. The second case is a toy example where we know the ground truth.
+
+
+\section{GTEx Correlation Network}
+In this section, we define the objective to be optimizing the known pathway recovery based on the GTEx gene expression data. We formally define the objective as the average AUC across pathways and we also keep track of the average AUPR value. $corMatToAUC()$ is the main objective function with two inputs: $data$ and $GS$. $data$ is the GTEx gene correlation matrix and $GS$ stands for the pathway matrix.  You can refer to the $corMatToAUC()$ documentation for more information.
+\begin{Schunk}
+\begin{Sinput}
+> library(DataRemix)
+\end{Sinput}
+\end{Schunk}
+We first load the data. $GTex\_cc$ stands for the GTEx gene correlation matrix with dimension 7294-by-7294 and $canonical$ represents the canonical mSigDB pathways with dimension 7294-by-1330. $GTex\_cc$ and $canonical$ correspond to $data$ and $GS$ as input to $corMatToAUC()$. In this case, we directly remix the correlation matrix $GTex\_cc$. The other way is to remix the gene expression profile first and then calculate the correlation matrix where $GTex\_cc$ is remixed in an indirect way. First we need to perform SVD decomposition of $GTex\_cc$. Since it takes long to decompose $GTex\_cc$, we pre-compute the SVD decomposition of $GTex\_cc$ and load it as $GTex\_svdres$.
+\begin{Schunk}
+\begin{Sinput}
+> load(url("https://www.dropbox.com/s/o949wkg76k0ccaw/GTex_cc.rdata?dl=1"))
+> load(url("https://www.dropbox.com/s/wsuze8w2rp0syqg/GTex_svdres.rdata?dl=1"))
+> load(url("https://github.com/wgmao/DataRemix/blob/master/inst/extdata/canonical.rdata?raw=true"))
+> #svdres <- svd(GTex_cc)
+\end{Sinput}
+\end{Schunk}
+We first run $corMatToAUC()$ on the un-remixed correlation matrix $GTex\_cc$ to show what $corMatToAUC()$ outputs.
+\begin{Schunk}
+\begin{Sinput}
+> GTex_default <- corMatToAUC(GTex_cc, canonical, objective = "mean.AUC")
+> GTex_default
+\end{Sinput}
+\begin{Soutput}
+[1] 0.04512071 0.72433810
+\end{Soutput}
+\end{Schunk}
+The first value corresponds to the average AUPR across all pathways and the second value corresponds to the average AUC across all pathways. This is the default behavior of $corMatToAUC()$. We now try to infer the optimal combinations of k, p and $\mu$ using $DataRemix()$. In this case $GS$ is the additional input required by $corMatToAUC()$ function. Users just need to include any additional parameter like $GS$ required by the objective at the end of function input.
+\begin{Schunk}
+\begin{Sinput}
+> rownames(GTex_svdres$u) <- rownames(GTex_cc)
+> rownames(GTex_svdres$v) <- colnames(GTex_cc)
+> DataRemix.res <- DataRemix(GTex_svdres, GTex_cc, corMatToAUC, 
++                            k_limits = c(1, length(GTex_svdres$d)%/%2), 
++                            p_limits = c(-1,1), mu_limits = c(1e-12,1), 
++                            num_of_initialization = 5, num_of_thompson = 150, 
++                            basis = "omega", basis_size = 2000, verbose = F, 
++                            GS = canonical)
+\end{Sinput}
+\end{Schunk}
+It is highly recommended to assign $rownames$ and $colnames$ to $\textbf{svdres}$. Other parameters are explained as follows.
+\begin{itemize}
+\item \textbf{k\_limits = c(1, length(GTex\_svdres\$d)/2)}: The upper limit of possible $k$ is half of the rank which is 3,647 in this case.
+\item \textbf{p\_limits = c(-1,1)}: This is the default range for $p$
+\item \textbf{mu\_limits = c(1e-12,1)}: The is the default range for $\mu$
+\item \textbf{num\_of\_initialization = 5}: Number of initialization steps before Thompson Sampling starts. It doesn't need to be a large number and 5 is the default option.
+\item \textbf{num\_of\_thompson = 150}: Number of Thompson Sampling steps. Generally the performance of the objective will be improved as sampling steps increase.
+\item \textbf{basis = "omega"}: The default option is to use the exponential kernel. There are also Gaussian kernel and Laplacian kernel as available options.
+\item \textbf{basis\_size = 2000}: As \textbf{base\_size} increases, the approximation of kernel will be more accurate. 2,000 is a good trade-off in general.
+\item \textbf{verbose = F}: If the computation takes long time to finish, it's helpful to print out intermediate results by setting \textbf{verbose} to be True.
+\end{itemize}
+
+We can convert the output from $DataRemix()$ into a ranking table and we can easily tell the best combinations of parameters by looking at this ranking table. Here are the explanations of the $DataRemix\_display()$ parameters.
+\begin{itemize}
+\item \textbf{$DataRemix.res$}: This is the output in the last step. 
+\item \textbf{$col.names = c("Rank", "k", "p", "mu", "mean AUPR", "mean AUC")$}: The first four values ("Rank", "k", "p", "mu") are fixed. Two additional values ("mean AUPR", "mean AUC") correspond to the output values of the objective function $corMatToAUC()$. These additional vaules need to be customized based on the objective function in use.
+\item \textbf{$top.rank = 15$}: We want to see the top 15 best-performing combinations of parameters.
+\end{itemize}
+\begin{Schunk}
+\begin{Sinput}
+> DataRemix_display(DataRemix.res, col.names = c("Rank", "k", "p", "mu", 
++                   "mean AUPR", "mean AUC"), top.rank = 15)
+\end{Sinput}
+\begin{Soutput}
+|Rank |k    |p         |mu        |mean AUPR |mean AUC  |
+|:----|:----|:---------|:---------|:---------|:---------|
+|1    |1332 |0.3116507 |1.0000000 |0.1054801 |0.7763531 |
+|2    |2138 |0.3145490 |1.0000000 |0.1074130 |0.7762209 |
+|3    |712  |0.3182285 |0.0132889 |0.0991840 |0.7761954 |
+|4    |818  |0.3189755 |0.0000003 |0.1002526 |0.7761044 |
+|5    |2419 |0.3304548 |0.0003722 |0.1063780 |0.7760946 |
+|6    |2175 |0.3554004 |0.0000069 |0.1037526 |0.7760602 |
+|7    |814  |0.3159315 |0.0000305 |0.1003838 |0.7760317 |
+|8    |539  |0.3058044 |0.0000000 |0.0973729 |0.7759846 |
+|9    |1522 |0.3113343 |0.0000000 |0.1057226 |0.7759222 |
+|10   |2333 |0.3267357 |0.0000008 |0.1065736 |0.7759112 |
+|11   |3432 |0.3305944 |0.0008201 |0.1063380 |0.7758878 |
+|12   |2578 |0.3410727 |0.0000000 |0.1055098 |0.7758741 |
+|13   |2074 |0.3156959 |0.0000000 |0.1071175 |0.7758633 |
+|14   |3123 |0.3449386 |0.0000000 |0.1049870 |0.7758340 |
+|15   |1021 |0.3170331 |0.0005042 |0.1023577 |0.7758292 |
+\end{Soutput}
+\end{Schunk}
+
+
 \section{A Toy Example}
-In this section, we define a simple objective function called $eval()$ which calculates the sum of a penalty term and the squared error between the DataRemix reconstruction and the original input matrix. This example illustrates how to include additional parameters which are necessary for the customized evaluation function fn() into DataRemix framework. The input matrix is a 100-by-9 matrix with random values. In this case, we know that when k=9,p=1 or $\mu=1$, p=1, DataRemix reconstruction is the same as the orginial matrix and the objective function achieves the minimal value which is qual to the penalty term we add. 
+In this section, we define a simple objective function called $eval()$ which calculates the sum of a penalty term and the squared error between the DataRemix reconstruction and the original input matrix. The input matrix is a 100-by-9 matrix with random values. In this case, we know that when (k=9, p=1) or ($\mu=1$, p=1), DataRemix reconstruction is the same as the original matrix and the objective function achieves the minimal value which is equal to the penalty term we add. 
 \begin{Schunk}
 \begin{Sinput}
 > library(DataRemix)
@@ -14,7 +109,7 @@ In this section, we define a simple objective function called $eval()$ which cal
 + }#eval
 \end{Sinput}
 \end{Schunk}
-First we genrate a random matrix with dimension 100-by-9 and perform the SVD decomposition.
+First we generate a random matrix with dimension 100-by-9 and perform the SVD decomposition.
 \begin{Schunk}
 \begin{Sinput}
 > set.seed(1)
@@ -24,146 +119,81 @@ First we genrate a random matrix with dimension 100-by-9 and perform the SVD dec
 > svdres <- svd(X)
 \end{Sinput}
 \end{Schunk}
-Set mt to be 2000.
-\begin{Schunk}
-\begin{Sinput}
-> basis_short <- omega[1:2000,]
-\end{Sinput}
-\end{Schunk}
-Infer the optimal combinations of k, p and $\mu$. Here $X$ and $penalty$ are additional inputs for the $eval()$ function. If we have the full SVD decomposition, we can leave matrix as NULL. For some large-scale matrices, if the SVD computation is time intensive, we don't need to finish the full SVD. Instead we can just compute the SVD decomposition up to a sufficient rank and inlcude the original gene expression profile to calculate the residual.
+Here $X$ and $penalty$ are additional inputs for the $eval()$ function. If we have the full SVD decomposition, we can leave matrix as NULL. For some large-scale matrices, if the SVD computation is time intensive, we don't need to finish the full SVD. Instead we can just compute the SVD decomposition up to a sufficient rank and include the original gene expression profile to calculate the residual. 
 \begin{Schunk}
 \begin{Sinput}
 > DataRemix.res <- DataRemix(svdres, matrix = NULL, eval, 
 +                  k_limits = c(1, length(svdres$d)), p_limits = c(-1,1), 
 +                  mu_limits = c(1e-12,1), num_of_initialization = 5, 
-+                  num_of_thompson = 50, basis = basis_short, xi = 0.1, 
-+                  full = T, verbose = F, X = X, penalty = 100)
-> knitr::kable(cbind(1:55,DataRemix.res$para), align = "l", 
-+              col.names = c("Iteration","k","p","mu","Eval"))
++                  num_of_thompson = 50, basis = "omega", basis_size = 2000, 
++                  xi = 0.1, full = T, verbose = F, X = X, penalty = 100)
+\end{Sinput}
+\end{Schunk}
+We can convert the output from DataRemix into a ranking table with the help of $DataRemix\_display()$. Here we want to check the performance of all sampling steps including initialization steps and Thompson Sampling steps.
+\begin{Schunk}
+\begin{Sinput}
+> DataRemix_display(DataRemix.res, col.names = c("Rank", "k", "p", "mu", "Eval")
++                   , top.rank = 55)
 \end{Sinput}
 \begin{Soutput}
-|Iteration |k  |p          |mu        |Eval         |
-|:---------|:--|:----------|:---------|:------------|
-|1         |8  |0.9343941  |0.8669163 |80.1334695   |
-|2         |4  |-0.6161244 |0.0822944 |-774.5493431 |
-|3         |6  |-0.8592770 |0.5276627 |-674.5081307 |
-|4         |5  |-0.9036173 |0.5945408 |-595.2096802 |
-|5         |8  |0.1977374  |0.0279159 |-608.4540773 |
-|6         |5  |-0.3638044 |0.0000241 |-813.6702821 |
-|7         |2  |-0.8046778 |0.0000000 |-853.4656232 |
-|8         |9  |1.0000000  |0.0002110 |100.0000000  |
-|9         |9  |0.6661921  |0.0154153 |-184.7067747 |
-|10        |8  |0.6531390  |0.0000000 |-244.3300655 |
-|11        |8  |1.0000000  |0.2141172 |62.4173374   |
-|12        |9  |1.0000000  |0.0000423 |100.0000000  |
-|13        |1  |0.8418133  |0.0000000 |-717.5578470 |
-|14        |9  |1.0000000  |0.5691544 |100.0000000  |
-|15        |9  |0.6548131  |1.0000000 |-197.4167734 |
-|16        |4  |1.0000000  |0.0000000 |-312.2857721 |
-|17        |9  |0.8373235  |0.0000000 |2.5059486    |
-|18        |7  |1.0000000  |0.0000000 |-36.8397906  |
-|19        |9  |0.9417058  |0.0015476 |84.1358492   |
-|20        |5  |1.0000000  |1.0000000 |100.0000000  |
-|21        |8  |1.0000000  |0.0000000 |39.1484035   |
-|22        |8  |1.0000000  |0.0900272 |49.6118042   |
-|23        |3  |0.9365716  |0.0889231 |-349.7091651 |
-|24        |6  |1.0000000  |0.9720235 |99.8300098   |
-|25        |8  |0.9251656  |0.0003053 |15.2575305   |
-|26        |9  |1.0000000  |0.0211273 |100.0000000  |
-|27        |5  |0.8231541  |0.0000024 |-282.8900039 |
-|28        |8  |1.0000000  |0.0024223 |39.4428521   |
-|29        |9  |-0.0882469 |0.0000000 |-716.3423732 |
-|30        |9  |1.0000000  |0.0000002 |100.0000000  |
-|31        |5  |1.0000000  |0.0749025 |-158.2670247 |
-|32        |3  |0.7020952  |0.3133165 |-267.6340442 |
-|33        |8  |0.9529303  |0.0001027 |29.0614097   |
-|34        |5  |0.7020183  |1.0000000 |-76.1587541  |
-|35        |1  |0.1021742  |1.0000000 |-28.7859003  |
-|36        |5  |0.8742549  |0.5679676 |-2.4428053   |
-|37        |7  |0.7783341  |0.0000000 |-176.7300645 |
-|38        |7  |0.9761727  |0.0000957 |-39.3551455  |
-|39        |9  |-0.7851174 |0.0000025 |-830.6108355 |
-|40        |9  |0.6304672  |0.0000001 |-224.3579299 |
-|41        |1  |0.7011276  |0.9561123 |53.2877702   |
-|42        |7  |0.7868272  |0.0000064 |-168.6494520 |
-|43        |8  |1.0000000  |0.0000009 |39.1485116   |
-|44        |8  |1.0000000  |0.4135032 |79.0683587   |
-|45        |6  |0.8345570  |0.0000000 |-198.0291845 |
-|46        |1  |0.0284351  |0.0000001 |-833.9386866 |
-|47        |8  |0.9008744  |0.0000000 |-0.5474068   |
-|48        |9  |1.0000000  |0.0000000 |100.0000000  |
-|49        |2  |0.9689157  |0.1544205 |-370.4069143 |
-|50        |4  |0.9904412  |1.0000000 |99.7032505   |
-|51        |9  |1.0000000  |0.0000000 |100.0000000  |
-|52        |9  |1.0000000  |0.0234981 |100.0000000  |
-|53        |7  |1.0000000  |1.0000000 |100.0000000  |
-|54        |7  |0.3135010  |0.0025860 |-571.7045348 |
-|55        |7  |-0.9857505 |0.0000000 |-845.5505885 |
+|Rank |k  |p          |mu        |Eval        |
+|:----|:--|:----------|:---------|:-----------|
+|1    |9  |1.0000000  |0.5346220 |100.000000  |
+|2    |9  |1.0000000  |0.0000002 |100.000000  |
+|3    |9  |1.0000000  |0.0020029 |100.000000  |
+|4    |9  |1.0000000  |0.0000000 |100.000000  |
+|5    |8  |1.0000000  |1.0000000 |100.000000  |
+|6    |9  |1.0000000  |0.0000000 |100.000000  |
+|7    |9  |0.9885065  |0.2289662 |99.311898   |
+|8    |1  |0.9529448  |1.0000000 |97.975183   |
+|9    |1  |0.9519021  |0.9843942 |97.695083   |
+|10   |9  |0.9724742  |0.0050690 |96.199642   |
+|11   |8  |1.0000000  |0.5972939 |90.131563   |
+|12   |4  |0.9195328  |1.0000000 |82.287338   |
+|13   |9  |0.9098824  |0.0000000 |64.766607   |
+|14   |9  |0.8858570  |0.0000000 |46.484357   |
+|15   |7  |1.0000000  |0.3397068 |40.339607   |
+|16   |8  |1.0000000  |0.0000000 |39.148404   |
+|17   |8  |0.9829893  |0.0063752 |38.505809   |
+|18   |5  |0.8468720  |1.0000000 |35.804011   |
+|19   |7  |0.9071131  |0.4959941 |32.402425   |
+|20   |8  |0.9560001  |0.0008490 |30.362741   |
+|21   |8  |0.9334786  |0.0000000 |19.872703   |
+|22   |8  |0.8955563  |0.0000023 |-4.386826   |
+|23   |4  |0.9761921  |0.4788741 |-13.743072  |
+|24   |7  |0.7920235  |1.0000000 |-26.907903  |
+|25   |7  |1.0000000  |0.0008924 |-36.595679  |
+|26   |7  |1.0000000  |0.0000078 |-36.837663  |
+|27   |7  |1.0000000  |0.0000000 |-36.839786  |
+|28   |1  |-0.3328697 |1.0000000 |-49.196025  |
+|29   |8  |0.8238091  |0.0721614 |-57.771414  |
+|30   |9  |0.7668662  |0.0000008 |-71.658327  |
+|31   |7  |0.8649459  |0.0000000 |-99.852010  |
+|32   |6  |0.9774939  |0.0000001 |-119.276886 |
+|33   |9  |0.7085628  |0.0000000 |-136.993698 |
+|34   |1  |-1.0000000 |0.6418311 |-160.524211 |
+|35   |3  |0.3084525  |1.0000000 |-188.915207 |
+|36   |2  |-0.5627978 |1.0000000 |-192.583489 |
+|37   |9  |0.6405562  |0.0003280 |-213.240183 |
+|38   |5  |0.8670688  |0.0586511 |-218.104981 |
+|39   |8  |0.5435504  |1.0000000 |-293.878895 |
+|40   |3  |-1.0000000 |1.0000000 |-323.198408 |
+|41   |9  |0.5303805  |0.0000000 |-329.654878 |
+|42   |5  |0.3357020  |0.8206325 |-333.830467 |
+|43   |4  |0.7414971  |0.0000011 |-433.784003 |
+|44   |1  |0.9830502  |0.1402641 |-491.662872 |
+|45   |4  |-0.3851272 |0.5282913 |-503.773466 |
+|46   |5  |-0.8533292 |0.8497418 |-550.780064 |
+|47   |2  |1.0000000  |0.0001793 |-555.267264 |
+|48   |8  |0.1224019  |0.0000000 |-649.549622 |
+|49   |1  |0.9899227  |0.0000000 |-700.187003 |
+|50   |1  |-0.2663078 |0.0739005 |-733.472061 |
+|51   |4  |0.0626453  |0.0007248 |-755.796228 |
+|52   |3  |0.0283578  |0.0000000 |-786.519047 |
+|53   |1  |0.2086664  |0.0000142 |-819.885212 |
+|54   |9  |-0.8925854 |0.0000000 |-837.037311 |
+|55   |9  |-0.9629881 |0.1921438 |-840.465127 |
 \end{Soutput}
 \end{Schunk}
-\section{GTex Correlation Network}
-In this section, we define a different task of optimizing the known pathway recovery based on the GTex gene expression data. $corMatToAUC()$ is the main objective function with two inputs: $data$ and $GS$. We formally define the objective as the average AUC across pathways and we also keep track of the average AUPR value. You can refer to the $corMatToAUC()$ document for more information.
-\begin{Schunk}
-\begin{Sinput}
-> library(DataRemix)
-\end{Sinput}
-\end{Schunk}
-Load the data. $GTex\_cc$ stands for the GTex gene correlation matrix with dimension 7294-by-7294 and $canonical$ represents the canonical mSigDB pathways with dimension 7294-by-1330. It takes time to decompose $GTex\_cc$, thus we pre-compute the SVD decomposition of $GTex\_cc$ and load it as $GTex\_svdres$.
-\begin{Schunk}
-\begin{Sinput}
-> load(url("https://www.dropbox.com/s/o949wkg76k0ccaw/GTex_cc.rdata?dl=1"))
-> load(url("https://www.dropbox.com/s/wsuze8w2rp0syqg/GTex_svdres.rdata?dl=1"))
-> load(url("https://github.com/wgmao/DataRemix/blob/master/inst/extdata/canonical.rdata?raw=true"))
-> #svdres <- svd(GTex_cc)
-\end{Sinput}
-\end{Schunk}
-Run corMatToAUC() on the default correlation matrix $GTex\_cc$.
-\begin{Schunk}
-\begin{Sinput}
-> GTex_default <- corMatToAUC(GTex_cc, canonical)
-> GTex_default
-\end{Sinput}
-\begin{Soutput}
-[1] 0.0450869 0.7238648
-\end{Soutput}
-\end{Schunk}
-Set mt to be 2000.
-\begin{Schunk}
-\begin{Sinput}
-> basis_short <- omega[1:2000,]
-\end{Sinput}
-\end{Schunk}
-Infer the optimal combinations of k, p and $\mu$. Here $GS$ is the additional input for the $corMatToAUC()$ function.
-\begin{Schunk}
-\begin{Sinput}
-> DataRemix.res <- DataRemix(GTex_svdres, GTex_cc,corMatToAUC, 
-+                            k_limits = c(1, length(GTex_svdres$d)%/%2), 
-+                            p_limits = c(-1,1), mu_limits = c(1e-12,1), 
-+                            num_of_initialization = 5, num_of_thompson = 150, 
-+                            basis = basis_short, xi = 0.1, full = T, verbose = F, 
-+                            GS = canonical)
-> knitr::kable(cbind(1:15,DataRemix.res$full[order(DataRemix.res$para[,4],
-+             decreasing = T)[1:15],]), align = "l", col.names = c("Rank",
-+             "k","p","mu","mean AUPR", "mean AUC"))
-\end{Sinput}
-\begin{Soutput}
-|Rank |k    |p         |mu        |mean AUPR |mean AUC  |
-|:----|:----|:---------|:---------|:---------|:---------|
-|1    |1175 |0.3094122 |0.0000001 |0.1037430 |0.7758704 |
-|2    |2193 |0.3224210 |0.0007957 |0.1067562 |0.7758402 |
-|3    |674  |0.3092313 |0.0000000 |0.0992667 |0.7755660 |
-|4    |1960 |0.3387817 |0.0000004 |0.1046918 |0.7755577 |
-|5    |1649 |0.3305281 |0.0000022 |0.1047632 |0.7755438 |
-|6    |1201 |0.2953043 |0.0046469 |0.1050208 |0.7755354 |
-|7    |1822 |0.3051588 |0.0029203 |0.1072695 |0.7754740 |
-|8    |826  |0.2727391 |0.1386776 |0.1036309 |0.7754550 |
-|9    |2781 |0.3299403 |0.0002011 |0.1063461 |0.7753907 |
-|10   |2036 |0.3529152 |0.1020208 |0.1037271 |0.7753318 |
-|11   |3269 |0.3464010 |0.0000000 |0.1047787 |0.7752678 |
-|12   |1476 |0.3265687 |0.0000000 |0.1041608 |0.7752523 |
-|13   |3097 |0.3212749 |0.0000000 |0.1070279 |0.7752323 |
-|14   |1433 |0.3581519 |1.0000000 |0.1018863 |0.7752311 |
-|15   |3335 |0.3501867 |0.0118857 |0.1044306 |0.7752071 |
-\end{Soutput}
-\end{Schunk}
+
 \end{document}

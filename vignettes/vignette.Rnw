@@ -3,67 +3,99 @@
 \begin{document}
 \SweaveOpts{concordance=TRUE}
 
-\section{A Toy Example}
-In this section, we define a simple objective function called $eval()$ which calculates the sum of a penalty term and the squared error between the DataRemix reconstruction and the original input matrix. This example illustrates how to include additional parameters which are necessary for the customized evaluation function fn() into DataRemix framework. The input matrix is a 100-by-9 matrix with random values. In this case, we know that when k=9,p=1 or $\mu=1$, p=1, DataRemix reconstruction is the same as the orginial matrix and the objective function achieves the minimal value which is qual to the penalty term we add. 
-<<echo=TRUE>>=
+There are three essential inputs in order to run $DataRemix()$.
+
+\begin{itemize}
+\item \textbf{svdres}: This stands for the SVD decomposition output of the gene expression profile $svd(\textbf{matrix})$. If the matrix is large, SVD decomposition doesn't need to be full-rank $min(nrow(\textbf{matrix}), ncol(\textbf{matrix}))$ which is computationally intensive.
+\item \textbf{matrix}: This stands for the gene expression profile with the dimension $gene-by-sample$. If \textbf{svdres} is not full-rank, matrix needs to be included in order to calculate the residual. Generally including \textbf{matrix} makes the residual computation more efficient.
+\item \textbf{objective function}: Users have to specify a objective of interest. The objective function would use remixed data based on \textbf{svdres} and \textbf{matrix} as input. It's natural to include more parameters in the objective function. The following two examples will demonstrate how to include objective-specific parameters into the $DataRemix()$ function.
+\end{itemize}
+
+Here we list two examples to illustrate how to run $DataRemix()$ function. The first example is to optimize known pathway recovery based on the GTEx gene expression profile. The second case is a toy example where we know the ground truth.
+
+
+\section{GTEx Correlation Network}
+In this section, we define the objective to be optimizing the known pathway recovery based on the GTEx gene expression data. We formally define the objective as the average AUC across pathways and we also keep track of the average AUPR value. $corMatToAUC()$ is the main objective function with two inputs: $data$ and $GS$. $data$ is the GTEx gene correlation matrix and $GS$ stands for the pathway matrix.  You can refer to the $corMatToAUC()$ documentation for more information.
+<<echo=TRUE, eval=TRUE>>=
 library(DataRemix)
+@
+We first load the data. $GTex\_cc$ stands for the GTEx gene correlation matrix with dimension 7294-by-7294 and $canonical$ represents the canonical mSigDB pathways with dimension 7294-by-1330. $GTex\_cc$ and $canonical$ correspond to $data$ and $GS$ as input to $corMatToAUC()$. In this case, we directly remix the correlation matrix $GTex\_cc$. The other way is to remix the gene expression profile first and then calculate the correlation matrix where $GTex\_cc$ is remixed in an indirect way. First we need to perform SVD decomposition of $GTex\_cc$. Since it takes long to decompose $GTex\_cc$, we pre-compute the SVD decomposition of $GTex\_cc$ and load it as $GTex\_svdres$.
+<<echo=TRUE, eval=TRUE>>=
+load(url("https://www.dropbox.com/s/o949wkg76k0ccaw/GTex_cc.rdata?dl=1"))
+load(url("https://www.dropbox.com/s/wsuze8w2rp0syqg/GTex_svdres.rdata?dl=1"))
+load(url("https://github.com/wgmao/DataRemix/blob/master/inst/extdata/canonical.rdata?raw=true"))
+#svdres <- svd(GTex_cc)
+@
+We first run $corMatToAUC()$ on the un-remixed correlation matrix $GTex\_cc$ to show what $corMatToAUC()$ outputs.
+<<echo=TRUE, eval=TRUE>>=
+GTex_default <- corMatToAUC(GTex_cc, canonical, objective = "mean.AUC")
+GTex_default
+@
+The first value corresponds to the average AUPR across all pathways and the second value corresponds to the average AUC across all pathways. This is the default behavior of $corMatToAUC()$. We now try to infer the optimal combinations of k, p and $\mu$ using $DataRemix()$. In this case $GS$ is the additional input required by $corMatToAUC()$ function. Users just need to include any additional parameter like $GS$ required by the objective at the end of function input.
+<<echo=TRUE, eval=TRUE>>=
+rownames(GTex_svdres$u) <- rownames(GTex_cc)
+rownames(GTex_svdres$v) <- colnames(GTex_cc)
+
+DataRemix.res <- DataRemix(GTex_svdres, GTex_cc, corMatToAUC, 
+                           k_limits = c(1, length(GTex_svdres$d)%/%2), 
+                           p_limits = c(-1,1), mu_limits = c(1e-12,1), 
+                           num_of_initialization = 5, num_of_thompson = 150, 
+                           basis = "omega", basis_size = 2000, verbose = F, 
+                           GS = canonical)
+@
+It is highly recommended to assign $rownames$ and $colnames$ to $\textbf{svdres}$. Other parameters are explained as follows.
+\begin{itemize}
+\item \textbf{k\_limits = c(1, length(GTex\_svdres\$d)/2)}: The upper limit of possible $k$ is half of the rank which is 3,647 in this case.
+\item \textbf{p\_limits = c(-1,1)}: This is the default range for $p$
+\item \textbf{mu\_limits = c(1e-12,1)}: The is the default range for $\mu$
+\item \textbf{num\_of\_initialization = 5}: Number of initialization steps before Thompson Sampling starts. It doesn't need to be a large number and 5 is the default option.
+\item \textbf{num\_of\_thompson = 150}: Number of Thompson Sampling steps. Generally the performance of the objective will be improved as sampling steps increase.
+\item \textbf{basis = "omega"}: The default option is to use the exponential kernel. There are also Gaussian kernel and Laplacian kernel as available options.
+\item \textbf{basis\_size = 2000}: As \textbf{base\_size} increases, the approximation of kernel will be more accurate. 2,000 is a good trade-off in general.
+\item \textbf{verbose = F}: If the computation takes long time to finish, it's helpful to print out intermediate results by setting \textbf{verbose} to be True.
+\end{itemize}
+
+We can convert the output from $DataRemix()$ into a ranking table and we can easily tell the best combinations of parameters by looking at this ranking table. Here are the explanations of the $DataRemix\_display()$ parameters.
+\begin{itemize}
+\item \textbf{$DataRemix.res$}: This is the output in the last step. 
+\item \textbf{$col.names = c("Rank", "k", "p", "mu", "mean AUPR", "mean AUC")$}: The first four values ("Rank", "k", "p", "mu") are fixed. Two additional values ("mean AUPR", "mean AUC") correspond to the output values of the objective function $corMatToAUC()$. These additional vaules need to be customized based on the objective function in use.
+\item \textbf{$top.rank = 15$}: We want to see the top 15 best-performing combinations of parameters.
+\end{itemize}
+<<echo=TRUE, eval=TRUE>>=
+DataRemix_display(DataRemix.res, col.names = c("Rank", "k", "p", "mu", 
+                  "mean AUPR", "mean AUC"), top.rank = 15)
+@
+
+
+\section{A Toy Example}
+In this section, we define a simple objective function called $eval()$ which calculates the sum of a penalty term and the squared error between the DataRemix reconstruction and the original input matrix. The input matrix is a 100-by-9 matrix with random values. In this case, we know that when (k=9, p=1) or ($\mu=1$, p=1), DataRemix reconstruction is the same as the original matrix and the objective function achieves the minimal value which is equal to the penalty term we add. 
+<<echo=TRUE, eval=TRUE>>=
+library(DataRemix)
+
 eval <- function(X_reconstruct, X, penalty){
   return(-sum((X-X_reconstruct)^2)+penalty)
 }#eval
 @
-First we genrate a random matrix with dimension 100-by-9 and perform the SVD decomposition.
-<<echo=TRUE>>=
+First we generate a random matrix with dimension 100-by-9 and perform the SVD decomposition.
+<<echo=TRUE, eval=TRUE>>=
 set.seed(1)
 num_of_row <- 100
 num_of_col <- 9
 X <- matrix(rnorm(num_of_row*num_of_col), nrow = num_of_row, ncol = num_of_col)
 svdres <- svd(X)
 @
-Set mt to be 2000.
-<<echo=TRUE>>=
-basis_short <- omega[1:2000,]
-@
-Infer the optimal combinations of k, p and $\mu$. Here $X$ and $penalty$ are additional inputs for the $eval()$ function. If we have the full SVD decomposition, we can leave matrix as NULL. For some large-scale matrices, if the SVD computation is time intensive, we don't need to finish the full SVD. Instead we can just compute the SVD decomposition up to a sufficient rank and inlcude the original gene expression profile to calculate the residual.
-<<echo=TRUE>>=
+Here $X$ and $penalty$ are additional inputs for the $eval()$ function. If we have the full SVD decomposition, we can leave matrix as NULL. For some large-scale matrices, if the SVD computation is time intensive, we don't need to finish the full SVD. Instead we can just compute the SVD decomposition up to a sufficient rank and include the original gene expression profile to calculate the residual. 
+<<echo=TRUE, eval=TRUE>>=
 DataRemix.res <- DataRemix(svdres, matrix = NULL, eval, 
                  k_limits = c(1, length(svdres$d)), p_limits = c(-1,1), 
                  mu_limits = c(1e-12,1), num_of_initialization = 5, 
-                 num_of_thompson = 50, basis = basis_short, xi = 0.1, 
-                 full = T, verbose = F, X = X, penalty = 100)
-knitr::kable(cbind(1:55,DataRemix.res$para), align = "l", 
-             col.names = c("Iteration","k","p","mu","Eval"))
+                 num_of_thompson = 50, basis = "omega", basis_size = 2000, 
+                 xi = 0.1, full = T, verbose = F, X = X, penalty = 100)
 @
-\section{GTex Correlation Network}
-In this section, we define a different task of optimizing the known pathway recovery based on the GTex gene expression data. $corMatToAUC()$ is the main objective function with two inputs: $data$ and $GS$. We formally define the objective as the average AUC across pathways and we also keep track of the average AUPR value. You can refer to the $corMatToAUC()$ document for more information.
-<<echo=TRUE>>=
-library(DataRemix)
+We can convert the output from DataRemix into a ranking table with the help of $DataRemix\_display()$. Here we want to check the performance of all sampling steps including initialization steps and Thompson Sampling steps.
+<<echo=TRUE, eval=TRUE>>=
+DataRemix_display(DataRemix.res, col.names = c("Rank", "k", "p", "mu", "Eval")
+                  , top.rank = 55)
 @
-Load the data. $GTex\_cc$ stands for the GTex gene correlation matrix with dimension 7294-by-7294 and $canonical$ represents the canonical mSigDB pathways with dimension 7294-by-1330. It takes time to decompose $GTex\_cc$, thus we pre-compute the SVD decomposition of $GTex\_cc$ and load it as $GTex\_svdres$.
-<<echo=TRUE>>=
-load(url("https://www.dropbox.com/s/o949wkg76k0ccaw/GTex_cc.rdata?dl=1"))
-load(url("https://www.dropbox.com/s/wsuze8w2rp0syqg/GTex_svdres.rdata?dl=1"))
-load(url("https://github.com/wgmao/DataRemix/blob/master/inst/extdata/canonical.rdata?raw=true"))
-#svdres <- svd(GTex_cc)
-@
-Run corMatToAUC() on the default correlation matrix $GTex\_cc$.
-<<echo=TRUE>>=
-GTex_default <- corMatToAUC(GTex_cc, canonical)
-GTex_default
-@
-Set mt to be 2000.
-<<echo=TRUE>>=
-basis_short <- omega[1:2000,]
-@
-Infer the optimal combinations of k, p and $\mu$. Here $GS$ is the additional input for the $corMatToAUC()$ function.
-<<echo=TRUE>>=
-DataRemix.res <- DataRemix(GTex_svdres, GTex_cc,corMatToAUC, 
-                           k_limits = c(1, length(GTex_svdres$d)%/%2), 
-                           p_limits = c(-1,1), mu_limits = c(1e-12,1), 
-                           num_of_initialization = 5, num_of_thompson = 150, 
-                           basis = basis_short, xi = 0.1, full = T, verbose = F, 
-                           GS = canonical)
-knitr::kable(cbind(1:15,DataRemix.res$full[order(DataRemix.res$para[,4],
-            decreasing = T)[1:15],]), align = "l", col.names = c("Rank",
-            "k","p","mu","mean AUPR", "mean AUC"))
-@
+
 \end{document}
